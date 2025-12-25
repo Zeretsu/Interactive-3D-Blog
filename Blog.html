@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive 3D Blog</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #0f0f1e 100%);
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        /* Smooth native scrolling for anchor jumps */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.5s ease;
+        }
+
+        #loading.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loader {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(102, 126, 234, 0.2);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            font-size: 1.2em;
+            color: #667eea;
+        }
+
+        .content {
+            position: relative;
+            z-index: 1;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 80px 20px;
+            transition: opacity 0.3s ease;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 80px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            padding: 60px 40px;
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            transform: translateY(30px);
+            animation: fadeInUp 1s ease forwards 0.3s;
+        }
+
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            font-size: 3.5em;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientShift 3s ease infinite;
+            background-size: 200% 200%;
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .subtitle {
+            font-size: 1.3em;
+            color: #a0a0c0;
+            font-weight: 300;
+        }
+
+        article {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            padding: 50px;
+            margin-bottom: 40px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0;
+            transform: translateY(50px);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        article.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        article:hover {
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: 0 20px 60px rgba(102, 126, 234, 0.4);
+            border-color: rgba(102, 126, 234, 0.3);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        article h2 {
+            color: #b8c5ff;
+            margin-bottom: 20px;
+            font-size: 2em;
+            font-weight: 600;
+        }
+
+        article .date {
+            color: #888;
+            font-size: 0.95em;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        article .date:before {
+            content: "📅";
+        }
+
+        article p {
+            line-height: 1.9;
+            color: #d0d0e0;
+            margin-bottom: 15px;
+            font-size: 1.05em;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: rgba(20, 20, 40, 0.8);
+            backdrop-filter: blur(20px);
+            padding: 25px;
+            border-radius: 20px;
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            z-index: 2;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+            transition: transform 0.3s ease;
+        }
+
+        .controls:hover {
+            transform: translateY(-5px);
+        }
+
+        .controls p {
+            margin-bottom: 15px;
+            font-size: 1em;
+            color: #a0a0c0;
+            font-weight: 600;
+        }
+
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            z-index: 1000;
+            transition: width 0.1s ease;
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.8);
+        }
+
+        .cursor-particle {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            background: radial-gradient(circle, rgba(102, 126, 234, 0.8), transparent);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            animation: particleFade 1s ease-out forwards;
+        }
+
+        @keyframes particleFade {
+            to {
+                transform: translate(var(--tx), var(--ty)) scale(0);
+                opacity: 0;
+            }
+        }
+
+        .content.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                padding: 40px 15px;
+            }
+
+            header {
+                padding: 40px 25px;
+            }
+
+            h1 {
+                font-size: 2.5em;
+            }
+
+            article {
+                padding: 30px;
+            }
+
+            .controls {
+                bottom: 15px;
+                right: 15px;
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="loader"></div>
+        <div class="loading-text">Loading Experience...</div>
+    </div>
+
+    <div class="progress-bar" id="progressBar"></div>
+    <div id="canvas-container"></div>
+    
+    <div class="content">
+        <header>
+            <h1>Azreal</h1>
+            <p class="subtitle">Systems-oriented inquiry into cognition under sustained pressure</p>
+        </header>
+
+        <article data-scroll>
+            <h2>Core Focus</h2>
+            <p class="date">December 25, 2025</p>
+            <p>This work explores how attention, discipline, and performance are shaped not by motivation alone, but by chemistry, structure, and incentive. The central question is not how to become more productive, but what productivity demands — biologically, psychologically, and ethically — when it becomes a constant expectation.</p>
+            <p>The blog sits at the intersection of cognitive chemistry, academic research and self-directed study, nootropics and pharmacological productivity, optimization culture and its psychological cost, and control, restraint, and cognitive trade-offs.</p>
+            <p>Rather than offering advice or techniques, the writing documents observation, analysis, and consequence.</p>
+        </article>
+
+        <article data-scroll>
+            <h2>Chemistry, Cognition & Study</h2>
+            <p class="date">December 24, 2025</p>
+            <p>This approach is grounded in science-based study with a strong chemistry focus, particularly where neurochemistry intersects with learning, attention, and fatigue.</p>
+            <p>Topics examined include neurochemical pathways related to focus and motivation, stimulant-mediated attention and its limits, cognitive load and adaptation, and the difference between short-term performance and long-term capacity.</p>
+            <p>Claims are treated cautiously. When possible, analysis is anchored in peer-reviewed research. Where data is incomplete or conflicting, uncertainty is preserved rather than resolved prematurely.</p>
+        </article>
+
+        <article data-scroll>
+            <h2>Nootropics & Performance Inquiry</h2>
+            <p class="date">December 22, 2025</p>
+            <p>A recurring theme is the critical examination of nootropics and pharmacological enhancers — not as lifestyle tools, but as responses to systemic pressure. This includes documented engagement with compounds such as Dihexa and Semax, framed strictly as observational variables within constrained contexts.</p>
+            <p>One context was competitive chess, where a rapid increase in rating occurred over a limited time horizon (approximately 1400 to 1800 Elo within three months). This outcome is not presented as proof of causation or endorsement. Skill development is multifactorial.</p>
+            <p>The focus is on what sharpened attention reveals, what it suppresses, and what costs accumulate quietly in the background.</p>
+        </article>
+
+        <article data-scroll>
+            <h2>Method & Restraint</h2>
+            <p class="date">December 20, 2025</p>
+            <p>Self-experimentation, when present, is treated as methodology, not identity. There are no protocols, no dosages, and no recommendations in this work.</p>
+            <p>Observations are separated clearly from interpretation. Performance is never framed as moral success. Output is not treated as virtue. The approach is deliberately restrained — analytical, skeptical, and anti-evangelical.</p>
+            <p>There is no promise of transformation here, only clear documentation of trade-offs.</p>
+        </article>
+
+        <article data-scroll>
+            <h2>Broader Themes</h2>
+            <p class="date">December 18, 2025</p>
+            <p>Beyond chemistry, the writing expands into productivity as a modern moral obligation, optimization culture as a subtle coercive system, the erosion of baseline tolerance, and the tension between autonomy and performance.</p>
+            <p>Central topics include control as both stabilizer and trap, the psychological cost of constant optimization, and the question of what remains when enhancement becomes expectation.</p>
+            <p>The tone is deliberately restrained — analytical, skeptical, and rigorous. This work pushes back against shallow productivity narratives and treats chemical productivity seriously, not sensationally.</p>
+        </article>
+    </div>
+
+    <div class="controls">
+        <p>Navigation</p>
+        <div class="button-group">
+            <button onclick="toggleContentVisibility()">Toggle Content</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@r128/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@r128/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@r128/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script>
+        let scene, camera, renderer, flower, particles;
+        let isRotating = true;
+        let isExploded = false;
+        let showParticles = true;
+        let colorIndex = 0;
+        let rotationSpeed = 0.003;
+        let petalMeshes = [];
+        let isChaosMode = true;
+        let chaosIntensity = 2.5;
+        let contentVisible = true;
+        let composer, bloomPass;
+        let ophanimEye = null;
+        // Smooth scroll variables
+        let rawScroll = 0;
+        let smoothScroll = 0;
+        let contentOpacity = 1;
+        let scrollProgress = 0;  // 0-1: scroll percentage through page
+        
+        // Device-aware LOD for geometry detail
+        let geometryDetail = 5;  // Default: moderate quality
+        
+        function detectDeviceCapability() {
+            // Check for mobile or low-end device indicators
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const gpu = navigator.hardwareConcurrency || 4;
+            const ram = navigator.deviceMemory || 4;
+            
+            if (isMobile || gpu <= 2 || ram <= 2) {
+                geometryDetail = 3;  // Low-end: ~2.5k vertices per petal
+            } else if (gpu <= 4 || ram <= 4) {
+                geometryDetail = 4;  // Mobile/mid-range: ~10k vertices per petal
+            } else {
+                geometryDetail = 5;  // Desktop: ~40k vertices per petal (was 12 = millions)
+            }
+        }
+        
+        const colors = [
+            { base: 0x8899cc, specular: 0xccddff, env: 0x6677bb, particle: 0x88bbff },
+            { base: 0xcc88bb, specular: 0xffccee, env: 0xbb6699, particle: 0xff88cc },
+            { base: 0x88ccbb, specular: 0xccffee, env: 0x66bb99, particle: 0x88ffcc },
+            { base: 0xccaa88, specular: 0xffeedd, env: 0xbb9966, particle: 0xffcc88 },
+            { base: 0xff8866, specular: 0xffccaa, env: 0xcc6644, particle: 0xff9977 },
+            { base: 0x66ff88, specular: 0xaaffcc, env: 0x44cc66, particle: 0x77ff99 }
+        ];
+
+        function init() {
+            // Detect device capability and set geometry LOD before creating geometry
+            detectDeviceCapability();
+            
+            scene = new THREE.Scene();
+            
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 6;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setClearColor(0x000000, 0);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // Setup bloom post-processing for liquid-like smoothness
+            if (typeof THREE.EffectComposer !== 'undefined') {
+                composer = new THREE.EffectComposer(renderer);
+                const renderPass = new THREE.RenderPass(scene, camera);
+                composer.addPass(renderPass);
+                
+                bloomPass = new THREE.UnrealBloomPass(
+                    new THREE.Vector2(window.innerWidth, window.innerHeight),
+                    2.5,  // strength
+                    1.2,  // radius
+                    0.65  // threshold
+                );
+                composer.addPass(bloomPass);
+            } else {
+                composer = null;
+                bloomPass = null;
+            }
+
+            // Create the flower group
+            flower = new THREE.Group();
+            
+            // Create 4 large curved petals
+            for (let i = 0; i < 4; i++) {
+                const petal = createPetal();
+                petal.rotation.z = (i * Math.PI) / 2;
+                petal.userData.originalRotation = { z: (i * Math.PI) / 2 };
+                petal.userData.targetPosition = { x: 0, y: 0, z: 0 };
+                petal.userData.originalPosition = { x: 0, y: 0, z: 0 };
+                petalMeshes.push(petal);
+                flower.add(petal);
+            }
+
+            scene.add(flower);
+
+            // Create particle system
+            createParticles();
+
+            // Enhanced lighting setup
+            const ambientLight = new THREE.AmbientLight(0x404060, 0.6);
+            scene.add(ambientLight);
+
+            const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            keyLight.position.set(5, 5, 5);
+            scene.add(keyLight);
+
+            const fillLight = new THREE.DirectionalLight(0x8899ff, 0.6);
+            fillLight.position.set(-5, 0, 3);
+            scene.add(fillLight);
+
+            const rimLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            rimLight.position.set(0, -5, -5);
+            scene.add(rimLight);
+
+            const accentLight1 = new THREE.PointLight(0xff88cc, 0.5, 20);
+            accentLight1.position.set(3, 3, 3);
+            scene.add(accentLight1);
+
+            const accentLight2 = new THREE.PointLight(0x88ccff, 0.5, 20);
+            accentLight2.position.set(-3, -3, 3);
+            scene.add(accentLight2);
+
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('mousemove', onMouseMove);
+
+            // Initialize scroll values so camera/progress start consistent
+            rawScroll = window.scrollY || 0;
+            smoothScroll = rawScroll;
+
+            // Update composer on resize
+            window.addEventListener('resize', () => {
+                const width = window.innerWidth;
+                const height = window.innerHeight;
+                if (composer) {
+                    composer.setSize(width, height);
+                }
+            });
+
+            // Hide loading screen
+            setTimeout(() => {
+                document.getElementById('loading').classList.add('hidden');
+            }, 1500);
+
+            // Create ophanim eye
+            createOphanimEye();
+        }
+
+        function createOphanimEye() {
+            // Create eye as a group
+            const eyeGroup = new THREE.Group();
+            
+            // Eye white (sclera) - main eye sphere
+            const scleraGeometry = new THREE.SphereGeometry(0.5, 64, 64);
+            const scleraMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                metalness: 0.1,
+                roughness: 0.3,
+                envMapIntensity: 1.5
+            });
+            const sclera = new THREE.Mesh(scleraGeometry, scleraMaterial);
+            eyeGroup.add(sclera);
+            
+            // Iris - colored disc positioned on front of eye
+            const irisGeometry = new THREE.CircleGeometry(0.22, 64);
+            const irisMaterial = new THREE.MeshStandardMaterial({
+                color: 0x000000,
+                metalness: 0.3,
+                roughness: 0.4,
+                emissive: 0x000000,
+                emissiveIntensity: 0,
+                envMapIntensity: 2.0
+            });
+            const iris = new THREE.Mesh(irisGeometry, irisMaterial);
+            iris.position.z = 0.51;
+            iris.userData.originalPosition = { x: 0, y: 0 };
+            eyeGroup.add(iris);
+            
+            // Pupil - dark center that tracks cursor
+            const pupilGeometry = new THREE.SphereGeometry(0.12, 32, 32);
+            const pupilMaterial = new THREE.MeshStandardMaterial({
+                color: 0x000000,
+                metalness: 0.8,
+                roughness: 0.1,
+                envMapIntensity: 1.0
+            });
+            const pupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
+            pupil.position.z = 0.52;
+            pupil.userData.targetOffset = { x: 0, y: 0 };
+            eyeGroup.add(pupil);
+            
+            // Iris detail - radial lines for realism
+            const irisLinesGeometry = new THREE.BufferGeometry();
+            const irisLinePositions = [];
+            const irisLineIndices = [];
+            
+            for (let i = 0; i < 12; i++) {
+                const angle = (i / 12) * Math.PI * 2;
+                const x1 = Math.cos(angle) * 0.08;
+                const y1 = Math.sin(angle) * 0.08;
+                const x2 = Math.cos(angle) * 0.22;
+                const y2 = Math.sin(angle) * 0.22;
+                
+                irisLinePositions.push(x1, y1, 0.52);
+                irisLinePositions.push(x2, y2, 0.52);
+            }
+            
+            for (let i = 0; i < 12; i++) {
+                irisLineIndices.push(i * 2, i * 2 + 1);
+            }
+            
+            irisLinesGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(irisLinePositions), 3));
+            irisLinesGeometry.setIndex(new THREE.BufferAttribute(new Uint16Array(irisLineIndices), 1));
+            
+            const irisLinesMaterial = new THREE.LineBasicMaterial({
+                color: 0x444444,
+                linewidth: 2,
+                transparent: true,
+                opacity: 0.4
+            });
+            const irisLines = new THREE.LineSegments(irisLinesGeometry, irisLinesMaterial);
+            eyeGroup.add(irisLines);
+            
+            // Eye shine/corneal reflection - bright spot on surface
+            const shineGeometry = new THREE.SphereGeometry(0.15, 32, 32);
+            const shineMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                metalness: 1.0,
+                roughness: 0.0,
+                emissive: 0xffffff,
+                emissiveIntensity: 0.8,
+                transparent: true,
+                opacity: 0.7
+            });
+            const shine = new THREE.Mesh(shineGeometry, shineMaterial);
+            shine.position.set(-0.15, 0.15, 0.55);
+            eyeGroup.add(shine);
+            
+            // Position eye at origin
+            eyeGroup.position.set(0, 0, 0);
+            eyeGroup.visible = false;
+            eyeGroup.userData.iris = iris;
+            eyeGroup.userData.pupil = pupil;
+            eyeGroup.userData.targetScale = 0;
+            
+            ophanimEye = eyeGroup;
+            scene.add(ophanimEye);
+        }
+
+        function createPetal() {
+            // Create icosahedron with adaptive detail based on device capability
+            // Detail 3: ~2.5k vertices, Detail 4: ~10k, Detail 5: ~40k (was 12 = 1M+)
+            const geometry = new THREE.IcosahedronGeometry(1.5, geometryDetail);
+            
+            // Store original positions for morphing
+            geometry.userData.originalPositions = geometry.attributes.position.array.slice();
+            
+            // Pre-calculate shape targets for scroll-driven morphing
+            geometry.userData.shapeTargets = {
+                sphere: geometry.attributes.position.array.slice(),  // Already sphere
+                circle: calculateCircleShape(geometry),
+                cube: calculateCubeShape(geometry),
+                ophanim: calculateOphanimShape(geometry)
+            };
+            
+            const material = new THREE.MeshStandardMaterial({
+                color: 0xc0c0c0,
+                metalness: 0.95,
+                roughness: 0.15,
+                emissive: 0x808080,
+                emissiveIntensity: 0.3,
+                envMapIntensity: 2.5
+            });
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.userData.timeOffset = Math.random() * Math.PI * 2;
+            mesh.userData.morphInfluence = 0;
+            mesh.userData.velocities = new Array(geometry.attributes.position.array.length / 3).fill(null).map(() => ({ x: 0, y: 0, z: 0 }));
+            return mesh;
+        }
+        
+        function calculateCubeShape(geometry) {
+            const positions = geometry.attributes.position.array.slice();
+            const result = new Float32Array(positions.length);
+            
+            for (let i = 0; i < positions.length; i += 3) {
+                let x = positions[i];
+                let y = positions[i + 1];
+                let z = positions[i + 2];
+                
+                // Push vertices toward nearest cube face
+                const absX = Math.abs(x);
+                const absY = Math.abs(y);
+                const absZ = Math.abs(z);
+                const maxAbs = Math.max(absX, absY, absZ);
+                
+                // Normalize to cube size
+                const scale = 1.5 / maxAbs;
+                result[i] = x * scale;
+                result[i + 1] = y * scale;
+                result[i + 2] = z * scale;
+            }
+            
+            return result;
+        }
+        
+        function calculateTorusShape(geometry) {
+            const positions = geometry.attributes.position.array.slice();
+            const result = new Float32Array(positions.length);
+            
+            for (let i = 0; i < positions.length; i += 3) {
+                let x = positions[i];
+                let y = positions[i + 1];
+                let z = positions[i + 2];
+                
+                // Convert to cylindrical coords
+                const angle = Math.atan2(z, x);
+                const radiusCyl = Math.sqrt(x * x + z * z);
+                
+                // Torus: major radius ~2, minor radius ~0.8
+                const majorRadius = 1.2;
+                const minorRadius = 0.6;
+                const tubeRadius = Math.atan2(y, radiusCyl);
+                
+                result[i] = (majorRadius + minorRadius * Math.cos(tubeRadius)) * Math.cos(angle);
+                result[i + 1] = minorRadius * Math.sin(tubeRadius);
+                result[i + 2] = (majorRadius + minorRadius * Math.cos(tubeRadius)) * Math.sin(angle);
+            }
+            
+            return result;
+        }
+        
+        function calculateCircleShape(geometry) {
+            const positions = geometry.attributes.position.array.slice();
+            const result = new Float32Array(positions.length);
+            
+            for (let i = 0; i < positions.length; i += 3) {
+                let x = positions[i];
+                let z = positions[i + 2];
+                
+                // Project onto flat XZ plane and arrange in perfect circle
+                const angle = Math.atan2(z, x);
+                const radius = 1.5;
+                
+                result[i] = Math.cos(angle) * radius;
+                result[i + 1] = 0;  // Flatten to y=0 for perfect circle
+                result[i + 2] = Math.sin(angle) * radius;
+            }
+            
+            return result;
+        }
+        
+        function calculateOphanimShape(geometry) {
+            const positions = geometry.attributes.position.array.slice();
+            const result = new Float32Array(positions.length);
+            
+            for (let i = 0; i < positions.length; i += 3) {
+                let x = positions[i];
+                let y = positions[i + 1];
+                let z = positions[i + 2];
+                
+                // Determine which ring based on which plane the vertex is closest to
+                const absX = Math.abs(x);
+                const absY = Math.abs(y);
+                const absZ = Math.abs(z);
+                
+                // Find which coordinate is smallest (closest to plane)
+                const minAbs = Math.min(absX, absY, absZ);
+                
+                if (minAbs === absZ) {
+                    // Ring 1: XY plane (z ≈ 0)
+                    const angle = Math.atan2(y, x);
+                    result[i] = Math.cos(angle) * 2.2;
+                    result[i + 1] = Math.sin(angle) * 2.2;
+                    result[i + 2] = 0;
+                } else if (minAbs === absY) {
+                    // Ring 2: XZ plane (y ≈ 0)
+                    const angle = Math.atan2(z, x);
+                    result[i] = Math.cos(angle) * 2.8;
+                    result[i + 1] = 0;
+                    result[i + 2] = Math.sin(angle) * 2.8;
+                } else {
+                    // Ring 3: YZ plane (x ≈ 0)
+                    const angle = Math.atan2(z, y);
+                    result[i] = 0;
+                    result[i + 1] = Math.cos(angle) * 3.4;
+                    result[i + 2] = Math.sin(angle) * 3.4;
+                }
+            }
+            
+            return result;
+        }
+        
+        function calculateOphanimShapeWithRotation(baseShape, time) {
+            const result = new Float32Array(baseShape.length);
+            
+            for (let i = 0; i < baseShape.length; i += 3) {
+                let x = baseShape[i];
+                let y = baseShape[i + 1];
+                let z = baseShape[i + 2];
+                
+                // Classify based on which coordinate is 0 (or closest to 0)
+                const absX = Math.abs(x);
+                const absY = Math.abs(y);
+                const absZ = Math.abs(z);
+                
+                const minAbs = Math.min(absX, absY, absZ);
+                let rotX = 0, rotY = 0, rotZ = 0;
+                
+                // Ring 1: XY plane (z ≈ 0) → Rotate around Z axis
+                if (minAbs === absZ && absZ < 0.1) {
+                    rotZ = time * 2.0;
+                    const cos = Math.cos(rotZ);
+                    const sin = Math.sin(rotZ);
+                    result[i] = x * cos - y * sin;
+                    result[i + 1] = x * sin + y * cos;
+                    result[i + 2] = z;
+                }
+                // Ring 2: XZ plane (y ≈ 0) → Rotate around Y axis
+                else if (minAbs === absY && absY < 0.1) {
+                    rotY = time * 1.5;
+                    const cos = Math.cos(rotY);
+                    const sin = Math.sin(rotY);
+                    result[i] = x * cos + z * sin;
+                    result[i + 1] = y;
+                    result[i + 2] = -x * sin + z * cos;
+                }
+                // Ring 3: YZ plane (x ≈ 0) → Rotate around X axis
+                else if (minAbs === absX && absX < 0.1) {
+                    rotX = time * 1.0;
+                    const cos = Math.cos(rotX);
+                    const sin = Math.sin(rotX);
+                    result[i] = x;
+                    result[i + 1] = y * cos - z * sin;
+                    result[i + 2] = y * sin + z * cos;
+                } else {
+                    result[i] = x;
+                    result[i + 1] = y;
+                    result[i + 2] = z;
+                }
+            }
+            
+            return result;
+        }
+
+        function createParticles() {
+            const particleCount = 1000;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const velocities = [];
+
+            for (let i = 0; i < particleCount; i++) {
+                const radius = 8 + Math.random() * 4;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.random() * Math.PI * 2;
+
+                positions[i * 3] = radius * Math.sin(theta) * Math.cos(phi);
+                positions[i * 3 + 1] = radius * Math.sin(theta) * Math.sin(phi);
+                positions[i * 3 + 2] = radius * Math.cos(theta);
+
+                velocities.push({
+                    x: (Math.random() - 0.5) * 0.02,
+                    y: (Math.random() - 0.5) * 0.02,
+                    z: (Math.random() - 0.5) * 0.02
+                });
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+            const material = new THREE.PointsMaterial({
+                color: colors[0].particle,
+                size: 0.05,
+                transparent: true,
+                opacity: 0.6,
+                blending: THREE.AdditiveBlending
+            });
+
+            particles = new THREE.Points(geometry, material);
+            particles.userData.velocities = velocities;
+            scene.add(particles);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        let targetRotationX = 0;
+        let targetRotationY = 0;
+        let mouseX = 0;
+        let mouseY = 0;
+
+        function onMouseMove(event) {
+            mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+            mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            targetRotationY = mouseX * 0.5;
+            targetRotationX = mouseY * 0.3;
+
+            // Cursor particles
+            if (Math.random() > 0.7) {
+                createCursorParticle(event.clientX, event.clientY);
+            }
+        }
+
+        function onClick() {
+            explodeFlower();
+        }
+
+        function createCursorParticle(x, y) {
+            const particle = document.createElement('div');
+            particle.className = 'cursor-particle';
+            particle.style.left = x + 'px';
+            particle.style.top = y + 'px';
+            
+            const tx = (Math.random() - 0.5) * 100;
+            const ty = (Math.random() - 0.5) * 100;
+            particle.style.setProperty('--tx', tx + 'px');
+            particle.style.setProperty('--ty', ty + 'px');
+            
+            document.body.appendChild(particle);
+            
+            setTimeout(() => particle.remove(), 1000);
+        }
+
+        function toggleContentVisibility() {
+            contentVisible = !contentVisible;
+            const contentDiv = document.querySelector('.content');
+            contentDiv.style.pointerEvents = contentVisible ? 'auto' : 'none';
+            contentDiv.style.opacity = contentVisible ? contentOpacity : 0;
+        }
+
+        function changeColor() {
+            colorIndex = (colorIndex + 1) % colors.length;
+            flower.children.forEach(petal => {
+                petal.material.color.setHex(colors[colorIndex].base);
+                petal.material.emissive.setHex(colors[colorIndex].env);
+            });
+            particles.material.color.setHex(colors[colorIndex].particle);
+        }
+
+        function toggleRotation() {
+            isRotating = !isRotating;
+        }
+
+        function toggleParticles() {
+            showParticles = !showParticles;
+            particles.visible = showParticles;
+        }
+
+
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Flower rotation with multi-axis movement
+            if (isRotating) {
+                flower.rotation.z += rotationSpeed;
+                flower.rotation.x += rotationSpeed * 0.5;
+                flower.rotation.y += rotationSpeed * 0.7;
+            }
+            
+            // Smooth mouse follow
+            flower.rotation.y += (targetRotationY - flower.rotation.y) * 0.05;
+            flower.rotation.x += (targetRotationX - flower.rotation.x) * 0.05;
+            
+            // Floating animation with pulsing/breathing effect
+            flower.position.y = Math.sin(Date.now() * 0.001) * 0.2;
+            const pulseScale = 1 + Math.sin(Date.now() * 0.0005) * 0.08;
+            flower.scale.set(pulseScale, pulseScale, pulseScale);
+            
+            // Petal explosion animation and morphing
+            petalMeshes.forEach((petal, index) => {
+                petal.position.x += (petal.userData.targetPosition.x - petal.position.x) * 0.05;
+                petal.position.y += (petal.userData.targetPosition.y - petal.position.y) * 0.05;
+                petal.position.z += (petal.userData.targetPosition.z - petal.position.z) * 0.05;
+                
+                // Apply petal rotation when exploded
+                if (petal.userData.targetRotation) {
+                    petal.rotation.x += (petal.userData.targetRotation.x - petal.rotation.x) * 0.08;
+                    petal.rotation.y += (petal.userData.targetRotation.y - petal.rotation.y) * 0.08;
+                    petal.rotation.z += (petal.userData.targetRotation.z - petal.rotation.z) * 0.08;
+                }
+                
+                // Switch to wireframe material during ophanim phase (75-100% scroll)
+                const isInOphanimPhase = scrollProgress >= 0.75;
+                petal.material.wireframe = isInOphanimPhase;
+                
+                // Organic deformation based on time and mouse with dampening
+                const positions = petal.geometry.attributes.position.array;
+                const originalPositions = petal.geometry.userData.originalPositions;
+                const shapeTargets = petal.geometry.userData.shapeTargets;
+                const velocities = petal.userData.velocities;
+                
+                // Determine which shape morphing phase we're in based on scroll progress
+                let shapeTarget = new Float32Array(positions.length);
+                let morphProgress = 0;
+                
+                if (scrollProgress < 0.25) {
+                    // 0-25%: Blob (organic)
+                    shapeTarget = shapeTargets.sphere;
+                } else if (scrollProgress < 0.5) {
+                    // 25-50%: Morph from blob to perfect circle
+                    morphProgress = (scrollProgress - 0.25) / 0.25;
+                    morphProgress = morphProgress * morphProgress * (3 - 2 * morphProgress);  // Smoothstep
+                    for (let i = 0; i < shapeTarget.length; i++) {
+                        shapeTarget[i] = shapeTargets.sphere[i] * (1 - morphProgress) + shapeTargets.circle[i] * morphProgress;
+                    }
+                } else if (scrollProgress < 0.75) {
+                    // 50-75%: Morph from circle to cube
+                    morphProgress = (scrollProgress - 0.5) / 0.25;
+                    morphProgress = morphProgress * morphProgress * (3 - 2 * morphProgress);  // Smoothstep
+                    for (let i = 0; i < shapeTarget.length; i++) {
+                        shapeTarget[i] = shapeTargets.circle[i] * (1 - morphProgress) + shapeTargets.cube[i] * morphProgress;
+                    }
+                } else {
+                    // 75-100%: Morph from cube to ophanim (wheels within wheels)
+                    morphProgress = (scrollProgress - 0.75) / 0.25;
+                    morphProgress = morphProgress * morphProgress * (3 - 2 * morphProgress);  // Smoothstep
+                    
+                    // Apply time-based rotation to ophanim rings
+                    const time = Date.now() * 0.0005;
+                    const ophanimTarget = calculateOphanimShapeWithRotation(shapeTargets.ophanim, time);
+                    
+                    for (let i = 0; i < shapeTarget.length; i++) {
+                        shapeTarget[i] = shapeTargets.cube[i] * (1 - morphProgress) + ophanimTarget[i] * morphProgress;
+                    }
+                }
+                
+                for (let i = 0; i < positions.length; i += 3) {
+                    const x = originalPositions[i];
+                    const y = originalPositions[i + 1];
+                    const z = originalPositions[i + 2];
+                    
+                    // Time-based organic movement with multiple layers for chaos
+                    const time = Date.now() * 0.0008 + petal.userData.timeOffset;
+                    
+                    // Multiple frequency layers for unpredictability
+                    const noise1 = Math.sin(x * 2 + time) * Math.cos(y * 2 + time * 0.8) * Math.sin(time * 0.3);
+                    const noise2 = Math.cos(z * 2 + time * 1.2) * Math.sin(x + time * 0.6) * Math.cos(z * 3 + time * 0.5);
+                    const noise3 = Math.sin(y * 1.5 + time * 0.9) * Math.cos(x * 1.8 + time * 1.1) * 0.3;
+                    const noise4 = Math.sin(x * 3.5 + time * 1.3) * Math.sin(y * 2.7 + time * 0.7) * Math.cos(z * 2.2 + time * 0.4) * 0.4;
+                    const noise5 = Math.cos(time * 0.2 + Math.sqrt(x*x + y*y + z*z)) * 0.15;
+                    
+                    // Gravity toward shape target instead of center
+                    const targetX = shapeTarget[i];
+                    const targetY = shapeTarget[i + 1];
+                    const targetZ = shapeTarget[i + 2];
+                    const gravityX = -x * 0.06 / Math.max(1, Math.sqrt(x*x + y*y + z*z));
+                    const gravityY = -y * 0.06 / Math.max(1, Math.sqrt(x*x + y*y + z*z));
+                    const gravityZ = -z * 0.06 / Math.max(1, Math.sqrt(x*x + y*y + z*z));
+                    
+                    // Mouse influence
+                    const distFromMouse = Math.sqrt(
+                        (x - mouseX * 3) ** 2 + 
+                        (y - mouseY * 3) ** 2 + 
+                        z ** 2
+                    );
+                    const mouseInfluence = Math.max(0, 1 - distFromMouse / 4) * 0.5;
+                    
+                    // Target position with shape morphing + chaos + mouse
+                    const finalTargetX = targetX + (noise1 + noise2 + noise4) * 0.12 * chaosIntensity + mouseX * mouseInfluence * 0.25 + gravityX;
+                    const finalTargetY = targetY + (noise2 + noise3 + noise5) * 0.12 * chaosIntensity + mouseY * mouseInfluence * 0.25 + gravityY;
+                    const finalTargetZ = targetZ + (noise1 * noise4 + noise3) * 0.1 * chaosIntensity * Math.sin(time * 0.5) + gravityZ;
+                    
+                    // Apply dampening/momentum
+                    const dampening = 0.92;
+                    velocities[i / 3].x = velocities[i / 3].x * dampening + (finalTargetX - positions[i]) * 0.15;
+                    velocities[i / 3].y = velocities[i / 3].y * dampening + (finalTargetY - positions[i + 1]) * 0.15;
+                    velocities[i / 3].z = velocities[i / 3].z * dampening + (finalTargetZ - positions[i + 2]) * 0.15;
+                    
+                    positions[i] += velocities[i / 3].x;
+                    positions[i + 1] += velocities[i / 3].y;
+                    positions[i + 2] += velocities[i / 3].z;
+                }
+                
+                petal.geometry.attributes.position.needsUpdate = true;
+                petal.geometry.computeVertexNormals();
+            });
+            
+            // Particle animation
+            if (showParticles) {
+                const positions = particles.geometry.attributes.position.array;
+                const velocities = particles.userData.velocities;
+                
+                for (let i = 0; i < positions.length; i += 3) {
+                    positions[i] += velocities[i / 3].x;
+                    positions[i + 1] += velocities[i / 3].y;
+                    positions[i + 2] += velocities[i / 3].z;
+                    
+                    const dist = Math.sqrt(
+                        positions[i] ** 2 + 
+                        positions[i + 1] ** 2 + 
+                        positions[i + 2] ** 2
+                    );
+                    
+                    if (dist > 12 || dist < 6) {
+                        velocities[i / 3].x *= -1;
+                        velocities[i / 3].y *= -1;
+                        velocities[i / 3].z *= -1;
+                    }
+                }
+                
+                particles.geometry.attributes.position.needsUpdate = true;
+                particles.rotation.y += 0.001;
+            }
+
+            // Smooth scroll interpolation and UI updates
+            smoothScroll += (rawScroll - smoothScroll) * 0.12;
+            const scrollHeight = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
+            const scrolled = smoothScroll;
+            scrollProgress = Math.min(Math.max(scrolled / scrollHeight, 0), 1);
+            const progress = scrollProgress * 100;
+            document.getElementById('progressBar').style.width = progress + '%';
+
+            // Smooth fade for content based on scroll position (fade range: 0-80px)
+            const targetOpacity = Math.min(Math.max((scrolled - 0) / 80, 0), 1);
+            contentOpacity += (targetOpacity - contentOpacity) * 0.1;
+            const contentDiv = document.querySelector('.content');
+            if (contentVisible) {
+                contentDiv.style.opacity = contentOpacity;
+                contentDiv.style.pointerEvents = contentOpacity < 0.1 ? 'none' : 'auto';
+            }
+
+            // Smooth camera zoom/ parallax driven by smoothed scroll
+            const scrollFactor = Math.min(Math.max(scrolled / scrollHeight, 0), 1);
+            const targetCameraZ = scrolled >= 50 ? 6 + scrollFactor * 2 : 6;
+            camera.position.z += (targetCameraZ - camera.position.z) * 0.08;
+            
+            // Ophanim eye animation
+            if (scrollProgress >= 0.75) {
+                if (!ophanimEye.visible) {
+                    ophanimEye.visible = true;
+                }
+                
+                // Fade in eye as we approach and enter ophanim phase
+                const eyeFadeProgress = Math.min((scrollProgress - 0.75) / 0.15, 1);
+                ophanimEye.userData.targetScale = eyeFadeProgress;
+                
+                // Smoothly scale the eye
+                const targetScale = new THREE.Vector3(eyeFadeProgress, eyeFadeProgress, eyeFadeProgress);
+                ophanimEye.scale.lerp(targetScale, 0.1);
+                
+                // Eye rotates slowly
+                ophanimEye.rotation.z += 0.001;
+                
+                // Cursor tracking - accurate pupil following
+                const iris = ophanimEye.userData.iris;
+                const pupil = ophanimEye.userData.pupil;
+                
+                // Calculate distance from center to mouse position
+                const mouseDistance = Math.sqrt(mouseX * mouseX + mouseY * mouseY);
+                
+                // Iris radius = 0.22, Pupil radius = 0.12, so max safe offset = 0.09
+                const maxPupilOffset = 0.09;
+                let targetIrisX = 0;
+                let targetIrisY = 0;
+                
+                if (mouseDistance > 0.001) {
+                    // Normalize direction vector
+                    const normalizedX = mouseX / mouseDistance;
+                    const normalizedY = mouseY / mouseDistance;
+                    
+                    // Clamp distance to maximum (accounts for diagonal mouse at corners)
+                    const constrainedDistance = Math.min(mouseDistance, 1.2);
+                    
+                    // Apply constraint and scale to pupil offset
+                    targetIrisX = normalizedX * (constrainedDistance / 1.2) * maxPupilOffset;
+                    targetIrisY = normalizedY * (constrainedDistance / 1.2) * maxPupilOffset;
+                }
+                
+                // Very responsive iris movement for accuracy
+                iris.position.x += (targetIrisX - iris.position.x) * 0.35;
+                iris.position.y += (targetIrisY - iris.position.y) * 0.35;
+                
+                // Pupil follows iris
+                pupil.position.x = iris.position.x;
+                pupil.position.y = iris.position.y;
+                
+                // Subtle pulsing of iris intensity
+                const pulseFactor = 1 + Math.sin(Date.now() * 0.003) * 0.05;
+                iris.material.emissiveIntensity = 0;
+            } else {
+                ophanimEye.visible = false;
+            }
+            
+            if (composer) {
+                composer.render();
+            } else {
+                renderer.render(scene, camera);
+            }
+        }
+
+        // Scroll handling: capture raw scroll and do lightweight per-scroll work.
+        window.addEventListener('scroll', () => {
+            rawScroll = window.scrollY;
+
+            // Fade in articles immediately (keeps UX snappy for content reveal)
+            const articles = document.querySelectorAll('article[data-scroll]');
+            articles.forEach(article => {
+                const rect = article.getBoundingClientRect();
+                if (rect.top < window.innerHeight * 0.8) {
+                    article.classList.add('visible');
+                }
+            });
+        });
+
+        init();
+        animate();
+    </script>
+</body>
+</html>
