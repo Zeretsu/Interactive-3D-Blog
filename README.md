@@ -3,7 +3,7 @@
 A sophisticated, code-intensive exploration of cognition under sustained pressure. This project combines advanced 3D rendering with rigorous academic inquiry into attention, chemistry, and performance optimization.
 
 ## Overview
-
+![Screenshot_63](Screenshot_63.png) ![Screenshot_64](Screenshot_64.png)
 **Azreal** is an interactive web experience examining how attention, discipline, and performance are shaped by chemistry, structure, and incentive—not motivation alone. The blog documents observation, analysis, and consequence through scientific rigor while questioning optimization culture's psychological costs.
 
 The interface demonstrates advanced WebGL capabilities through scroll-driven geometry morphing, adaptive rendering optimization, and real-time shader-based deformation.
